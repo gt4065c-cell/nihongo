@@ -276,7 +276,7 @@ function renderHome(){
         <span class="day">${LANG === "en" ? t("day") + " " + (g + 1) : (g + 1) + t("day")}</span>
         <b>${H(gname(g))}</b>
         <span class="words jp">${its.map(i => H(i.word)).join(" · ")}</span>
-        <span class="meter"><i style="width:${accG}%"></i></span>
+        <span class="meter-row"><span class="meter"><i style="width:${Math.round(accG)}%"></i></span><span class="meter-v">${a ? Math.round(accG) + "%" : "–"}</span></span>
       </button>`;
     });
     groupsHtml += `</div>`;

@@ -102,6 +102,8 @@ const keyOf = n => n.trim().replace(/[.#$\[\]\/]/g, "_").slice(0, 40) || "guest"
    1순위: 브라우저 내장 음성(speechSynthesis) + 일본어 음성이 있을 때
    2순위: 온라인 음성 파일(Google 번역 TTS)을 <audio>로 재생
           → 카카오톡·네이버·인스타 등 인앱 브라우저, 일본어 음성이 없는 안드로이드폰 대응 */
+// 구글 음성은 Referer가 붙으면 404 → 이 페이지의 리퍼러 전송 끄기
+try { if (!document.querySelector('meta[name="referrer"]')) { const m = document.createElement("meta"); m.name = "referrer"; m.content = "no-referrer"; document.head.appendChild(m); } } catch(e){}
 let jaVoice = null, voicesLoaded = false;
 const hasSynth = "speechSynthesis" in window && "SpeechSynthesisUtterance" in window;
 function pickVoice(){ if (!hasSynth) return; const vs = speechSynthesis.getVoices(); if (vs.length) voicesLoaded = true; jaVoice = vs.find(v => /ja[-_]JP/i.test(v.lang)) || vs.find(v => /^ja/i.test(v.lang)) || null; }

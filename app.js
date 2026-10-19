@@ -123,31 +123,46 @@ function openExternal(){
   if (/Android/i.test(navigator.userAgent)) { location.href = "intent://" + url.replace(/^https?:\/\//, "") + "#Intent;scheme=https;package=com.android.chrome;end"; return; }
   toast("Safari/Chrome에서 열어 주세요");
 }
-function sayAudio(text, rate){
+// 미리 만들어 둔 음성 파일(audio/w0.mp3 = 0번 단어, audio/s0.mp3 = 0번 예문)
+const AUDIO_MAP = {};
+try { (window.ITEMS_RAW || []).forEach((r, i) => { AUDIO_MAP[String(r[2]).split("・")[0]] = "audio/w" + i + ".mp3"; AUDIO_MAP[r[7]] = "audio/s" + i + ".mp3"; }); } catch(e){}
+let sayToken = 0;
+function playUrl(url, rate, onFail){
+  const my = ++sayToken;
   if (hasSynth) { try { speechSynthesis.cancel(); } catch(e){} }
-  const q = encodeURIComponent(String(text).slice(0, 190));
+  ttsAudio.onerror = () => { if (my === sayToken && onFail) onFail(); };   // 파일이 없거나 네트워크 오류
   ttsAudio.pause();
-  ttsAudio.src = "https://translate.google.com/translate_tts?ie=UTF-8&tl=ja&client=tw-ob&q=" + q;
-  ttsAudio.playbackRate = (rate && rate < 0.9) ? 0.85 : 1;
-  ttsAudio.play().catch(() => {
-    if (isInApp() && confirm("이 앱 안의 브라우저에서는 음성이 재생되지 않을 수 있어요.\nChrome/Safari로 열까요?")) openExternal();
-    else toast("🔇 음성을 재생할 수 없어요. 다시 눌러 주세요");
+  ttsAudio.src = url;
+  ttsAudio.playbackRate = (rate && rate < 0.9) ? 0.9 : 1;
+  const pr = ttsAudio.play();
+  if (pr && pr.catch) pr.catch(err => {
+    if (my !== sayToken) return;                       // 다음 소리로 넘어가서 끊긴 것 → 정상
+    if (err && err.name === "AbortError") return;
+    if (err && err.name === "NotAllowedError") { toast("🔊 버튼을 눌러 들어 보세요"); return; }  // 자동재생 제한
+    if (onFail) onFail();
   });
+}
+function sayGoogle(text, rate){
+  playUrl("https://translate.google.com/translate_tts?ie=UTF-8&tl=ja&client=tw-ob&q=" + encodeURIComponent(String(text).slice(0, 190)), rate,
+    () => toast("🔇 음성을 불러오지 못했어요. 잠시 후 다시 눌러 주세요"));
+}
+function saySynth(text, rate){
+  const useSynth = hasSynth && (jaVoice || (!voicesLoaded && /iPhone|iPad|iPod|Macintosh/i.test(navigator.userAgent)));
+  if (!useSynth) { sayGoogle(text, rate); return; }
+  try {
+    ++sayToken; ttsAudio.pause(); speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text); u.lang = "ja-JP"; u.rate = rate || 0.9; if (jaVoice) u.voice = jaVoice;
+    let started = false; u.onstart = () => { started = true; };
+    u.onerror = () => { if (!started) sayGoogle(text, rate); };
+    speechSynthesis.speak(u);
+    setTimeout(() => { if (!started && !speechSynthesis.speaking) sayGoogle(text, rate); }, 1500);
+  } catch(e) { sayGoogle(text, rate); }
 }
 function say(text, rate){
   if (!text) return;
-  // 내장 음성 사용 조건: speechSynthesis 지원 + (일본어 음성 있음 또는 아직 목록 로딩 전인 iOS)
-  const useSynth = hasSynth && (jaVoice || (!voicesLoaded && /iPhone|iPad|iPod|Macintosh/i.test(navigator.userAgent)));
-  if (!useSynth) { sayAudio(text, rate); return; }
-  try {
-    speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text); u.lang = "ja-JP"; u.rate = rate || 0.9; if (jaVoice) u.voice = jaVoice;
-    let started = false; u.onstart = () => { started = true; };
-    u.onerror = () => { if (!started) sayAudio(text, rate); };
-    speechSynthesis.speak(u);
-    // 일부 폰은 오류 없이 무음 → 1.5초 안에 시작 안 하면 온라인 음성으로 전환
-    setTimeout(() => { if (!started && !speechSynthesis.speaking) sayAudio(text, rate); }, 1500);
-  } catch(e) { sayAudio(text, rate); }
+  const f = AUDIO_MAP[text];
+  if (f) playUrl(f, rate, () => saySynth(text, rate));   // 1순위: 사이트에 올려둔 음성 파일 (어느 폰·앱에서나 동작)
+  else saySynth(text, rate);
 }
 
 function toast(msg){ const el = document.getElementById("toast"); el.textContent = msg; el.classList.add("show"); clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove("show"), 1800); }

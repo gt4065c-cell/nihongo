@@ -124,8 +124,12 @@ h1,h2,h3{letter-spacing:-.02em;margin:0}
 .grp .day{font-size:max(var(--min),calc(11px*var(--fs)));font-weight:700;color:var(--red)}
 .grp b{display:block;font-size:max(var(--min),calc(14.5px*var(--fs)));margin:1px 0 2px}
 .grp .words{font-size:max(var(--min),calc(12.5px*var(--fs)));color:var(--ink2)}
-.grp .meter{height:4px;border-radius:4px;background:var(--paper2);margin-top:9px;overflow:hidden}
-.grp .meter i{display:block;height:100%;background:var(--green)}
+.grp{display:flex;flex-direction:column;align-items:stretch}
+.grp .meter-row{display:flex;align-items:center;gap:10px;margin-top:auto;padding-top:12px}
+.grp .meter{display:block;flex:1 1 auto;min-width:0;height:6px;border-radius:999px;background:var(--paper2);overflow:hidden}
+.grp .meter i{display:block;height:100%;min-width:0;border-radius:999px;background:var(--green);transition:width .4s ease}
+.grp .meter-v{flex:none;min-width:3ch;text-align:right;font-size:max(var(--min),calc(11.5px*var(--fs)));font-weight:700;color:var(--ink3);font-variant-numeric:tabular-nums}
+.grp.on .meter{background:rgba(45,62,107,.14)}
 .grp .chk{position:absolute;top:10px;right:11px;width:18px;height:18px;border-radius:50%;border:1.5px solid var(--line);display:grid;place-items:center;font-size:max(var(--min),calc(11px*var(--fs)));color:#fff}
 .grp.on .chk{background:var(--indigo);border-color:var(--indigo)}
 .sel-bar{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
@@ -258,6 +262,8 @@ html.m .kpi{padding:10px 8px}
 html.m .modes,html.m .groups{grid-template-columns:1fr;gap:3px}
 html.m .mode,html.m .grp{padding:14px 12px;border-radius:var(--r)}
 html.m .grp .chk{width:26px;height:26px;font-size:16px;top:12px;right:12px}
+html.m .grp .meter{height:8px}
+html.m .grp .meter-row{padding-top:14px}
 html.m .sel-bar{gap:3px;margin:4px 0}
 html.m .chipbtn{flex:1;padding:10px 8px}
 html.m .startbar{bottom:calc(90px + env(safe-area-inset-bottom));gap:3px;margin-top:10px}

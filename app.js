@@ -98,19 +98,56 @@ let statsView = "mine", statsSort = "rate";
 
 const keyOf = n => n.trim().replace(/[.#$\[\]\/]/g, "_").slice(0, 40) || "guest";
 
-/* ───────────── TTS ───────────── */
-let jaVoice = null;
-function pickVoice(){ if (!("speechSynthesis" in window)) return; const vs = speechSynthesis.getVoices(); jaVoice = vs.find(v => /ja[-_]JP/i.test(v.lang)) || vs.find(v => /^ja/i.test(v.lang)) || null; }
-if ("speechSynthesis" in window) { pickVoice(); speechSynthesis.onvoiceschanged = pickVoice; }
-const canSpeak = () => "speechSynthesis" in window;
+/* ───────────── TTS (모바일 대응) ─────────────
+   1순위: 브라우저 내장 음성(speechSynthesis) + 일본어 음성이 있을 때
+   2순위: 온라인 음성 파일(Google 번역 TTS)을 <audio>로 재생
+          → 카카오톡·네이버·인스타 등 인앱 브라우저, 일본어 음성이 없는 안드로이드폰 대응 */
+let jaVoice = null, voicesLoaded = false;
+const hasSynth = "speechSynthesis" in window && "SpeechSynthesisUtterance" in window;
+function pickVoice(){ if (!hasSynth) return; const vs = speechSynthesis.getVoices(); if (vs.length) voicesLoaded = true; jaVoice = vs.find(v => /ja[-_]JP/i.test(v.lang)) || vs.find(v => /^ja/i.test(v.lang)) || null; }
+if (hasSynth) { pickVoice(); try { speechSynthesis.addEventListener("voiceschanged", pickVoice); } catch(e) { speechSynthesis.onvoiceschanged = pickVoice; } }
+const canSpeak = () => true; // 내장 음성이 없어도 온라인 음성으로 재생 가능
+const ttsAudio = new Audio(); ttsAudio.preload = "auto";
+// iOS/안드로이드 자동재생 제한 해제: 첫 터치 때 오디오 잠금 해제
+document.addEventListener("touchstart", function unlock(){
+  try { ttsAudio.muted = true; ttsAudio.play().catch(()=>{}).finally(()=>{ ttsAudio.pause(); ttsAudio.muted = false; }); } catch(e){}
+  if (hasSynth) { try { speechSynthesis.speak(new SpeechSynthesisUtterance("")); } catch(e){} }
+  document.removeEventListener("touchstart", unlock);
+}, { once: true, passive: true });
+const isInApp = () => /KAKAOTALK|NAVER|Instagram|FBAN|FBAV|Line\/|DaumApps|wv\)/i.test(navigator.userAgent);
+function openExternal(){
+  const url = location.href;
+  if (/KAKAOTALK/i.test(navigator.userAgent)) { location.href = "kakaotalk://web/openExternal?url=" + encodeURIComponent(url); return; }
+  if (/Android/i.test(navigator.userAgent)) { location.href = "intent://" + url.replace(/^https?:\/\//, "") + "#Intent;scheme=https;package=com.android.chrome;end"; return; }
+  toast("Safari/Chrome에서 열어 주세요");
+}
+function sayAudio(text, rate){
+  if (hasSynth) { try { speechSynthesis.cancel(); } catch(e){} }
+  const q = encodeURIComponent(String(text).slice(0, 190));
+  ttsAudio.pause();
+  ttsAudio.src = "https://translate.google.com/translate_tts?ie=UTF-8&tl=ja&client=tw-ob&q=" + q;
+  ttsAudio.playbackRate = (rate && rate < 0.9) ? 0.85 : 1;
+  ttsAudio.play().catch(() => {
+    if (isInApp() && confirm("이 앱 안의 브라우저에서는 음성이 재생되지 않을 수 있어요.\nChrome/Safari로 열까요?")) openExternal();
+    else toast("🔇 음성을 재생할 수 없어요. 다시 눌러 주세요");
+  });
+}
 function say(text, rate){
-  if (!canSpeak()) { toast("TTS not supported"); return; }
-  speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(text); u.lang = "ja-JP"; u.rate = rate || 0.9; if (jaVoice) u.voice = jaVoice;
-  speechSynthesis.speak(u);
+  if (!text) return;
+  // 내장 음성 사용 조건: speechSynthesis 지원 + (일본어 음성 있음 또는 아직 목록 로딩 전인 iOS)
+  const useSynth = hasSynth && (jaVoice || (!voicesLoaded && /iPhone|iPad|iPod|Macintosh/i.test(navigator.userAgent)));
+  if (!useSynth) { sayAudio(text, rate); return; }
+  try {
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text); u.lang = "ja-JP"; u.rate = rate || 0.9; if (jaVoice) u.voice = jaVoice;
+    let started = false; u.onstart = () => { started = true; };
+    u.onerror = () => { if (!started) sayAudio(text, rate); };
+    speechSynthesis.speak(u);
+    // 일부 폰은 오류 없이 무음 → 1.5초 안에 시작 안 하면 온라인 음성으로 전환
+    setTimeout(() => { if (!started && !speechSynthesis.speaking) sayAudio(text, rate); }, 1500);
+  } catch(e) { sayAudio(text, rate); }
 }
 
-/* ───────────── UI helpers ───────────── */
 function toast(msg){ const el = document.getElementById("toast"); el.textContent = msg; el.classList.add("show"); clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove("show"), 1800); }
 function applyStatic(){
   document.documentElement.lang = LANG;

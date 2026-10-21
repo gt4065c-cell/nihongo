@@ -91,6 +91,7 @@ let profile = store.get("profile") || { xp: 0, answered: 0, correct: 0 };
 let globalStats = {};
 let online = false;
 let sel = { groups: store.get("groups") || [0], mode: store.get("mode") || "mix" };
+let curLevel = store.get("level") || 1;
 let quiz = null;
 let tab = "home";
 let studyState = { g: 0, view: "list", idx: 0, flipped: false };
@@ -263,17 +264,22 @@ function renderHome(){
   const modeBtns = ["mix", ...MODES].map(m =>
     `<button class="mode ${sel.mode === m ? "on" : ""}" onclick="setMode('${m}')"><b>${t("m_" + m)}</b><span>${t("m_" + m + "S")}</span></button>`).join("");
   let groupsHtml = "";
-  [1, 2, 3].forEach(st => {
-    groupsHtml += `<div class="stage-label">${LANG === "en" ? t("stage") + " " + st : st + t("stage")}</div><div class="groups">`;
+  const lvStages = curLevel === 1 ? [1,2,3] : [4,5,6];
+  lvStages.forEach(st => {
+    const stLabel = curLevel === 1
+      ? (LANG === "en" ? t("stage") + " " + st : st + t("stage"))
+      : (LANG === "en" ? "PART " + (st - 3) : "PART " + (st - 3));
+    groupsHtml += `<div class="stage-label">${stLabel}</div><div class="groups">`;
     GROUPS.forEach((G, g) => {
       if (G.stage !== st) return;
+      const dayNum = G.stage <= 3 ? g + 1 : g - 14;
       const its = ITEMS.filter(it => it.g === g);
       const a = its.reduce((s, it) => s + rec(it.id).a, 0), w = its.reduce((s, it) => s + rec(it.id).w, 0);
       const accG = a ? (a - w) / a * 100 : 0;
       const on = sel.groups.includes(g);
       groupsHtml += `<button class="grp ${on ? "on" : ""}" onclick="toggleGroup(${g})">
         <span class="chk">${on ? "✓" : ""}</span>
-        <span class="day">${LANG === "en" ? t("day") + " " + (g + 1) : (g + 1) + t("day")}</span>
+        <span class="day">${LANG === "en" ? t("day") + " " + dayNum : dayNum + t("day")}</span>
         <b>${H(gname(g))}</b>
         <span class="words jp">${its.map(i => H(i.word)).join(" · ")}</span>
         <span class="meter-row"><span class="meter"><i style="width:${Math.round(accG)}%"></i></span><span class="meter-v">${a ? Math.round(accG) + "%" : "–"}</span></span>
@@ -294,7 +300,10 @@ function renderHome(){
     <div class="section-t"><h2>${t("modeT")}</h2><span>${t("modeS")}</span></div>
     <div class="modes">${modeBtns}</div>
     <div class="section-t"><h2>${t("grpT")}</h2><span>${t("grpS")}</span></div>
-    <div class="sel-bar"><button class="chipbtn" onclick="selAll(true)">${t("selAll")}</button><button class="chipbtn" onclick="selAll(false)">${t("selNone")}</button></div>
+    <div class="sel-bar">
+      <div class="seg"><button onclick="setLevel(1)" class="${curLevel===1?'on':''}" style="padding:5px 14px">LV 1</button><button onclick="setLevel(2)" class="${curLevel===2?'on':''}" style="padding:5px 14px">LV 2</button></div>
+      <button class="chipbtn" onclick="selAll(true)">${t("selAll")}</button><button class="chipbtn" onclick="selAll(false)">${t("selNone")}</button>
+    </div>
     ${groupsHtml}
     <div class="startbar">
       <button class="btn ghost" style="background:var(--card)" onclick="startQuiz('weak')">${t("startWeak")}</button>
@@ -304,7 +313,8 @@ function renderHome(){
 }
 function setMode(m){ sel.mode = m; store.set("mode", m); renderHome(); }
 function toggleGroup(g){ const i = sel.groups.indexOf(g); if (i >= 0) sel.groups.splice(i, 1); else sel.groups.push(g); store.set("groups", sel.groups); renderHome(); }
-function selAll(on){ sel.groups = on ? GROUPS.map((_, i) => i) : []; store.set("groups", sel.groups); renderHome(); }
+function selAll(on){ const stages = curLevel === 1 ? [1,2,3] : [4,5,6]; sel.groups = on ? GROUPS.map((_, i) => i).filter(i => stages.includes(GROUPS[i].stage)) : []; store.set("groups", sel.groups); renderHome(); }
+function setLevel(n){ curLevel = n; store.set("level", n); sel.groups = []; store.set("groups", []); renderHome(); }
 
 /* ───────────── QUIZ ───────────── */
 const ROUND = 10;
